@@ -1,7 +1,7 @@
 {
-  "name": "Midnattsgänget",
-  "short_name": "Midnattsgänget",
-  "description": "Ett socialt bluffspel för kompisgänget.",
+  "name": "Blush & Bluff",
+  "short_name": "Blush & Bluff",
+  "description": "Ett socialt bluffspel om stil och beauty för kompisgänget.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#fff2f8",

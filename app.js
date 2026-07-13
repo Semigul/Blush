@@ -21,11 +21,11 @@ const hostGameKey = 'blush-bluff:host-game';
 const emojis = ['🦊', '🦇', '🐈‍⬛', '🦉', '🐺', '🪩', '🦄', '🍒', '💿', '🛼', '🧃', '🌙'];
 
 const roles = {
-  ulv: { name: 'Stilsabotör', icon: '🖤', text: 'Du är en Stilsabotör. Hitta de andra sabotörerna under natten och bluffa er till seger.' },
-  siare: { name: 'Trendorakel', icon: '💄', text: 'Du är Trendoraklet. Under natten får du kika på en annan spelares stilroll — eller två kort i mitten.' },
-  bråkmakare: { name: 'Makeupartist', icon: '💋', text: 'Du får byta stilroller mellan två andra spelare under natten. Skapa lite beauty-kaos!' },
-  sömnig: { name: 'Nagelmodell', icon: '💅', text: 'Du gör ingenting i natt. På morgonen: läs rummet och försök lista ut vem som saboterar stilen.' },
-  bybo: { name: 'Modeikon', icon: '👠', text: 'Du är en Modeikon. Håll ögonen öppna och hjälp laget att hitta Stilsabotören.' }
+  ulv: { name: 'Trendtjuv', icon: '🖤', text: 'Du vill undvika att bli utpekad. Under samtalet ska du få minst två personer att säga ordet “glow” utan att avslöja varför. Lyckas du, har du ett hemligt ess i ärmen vid omröstningen.' },
+  siare: { name: 'Moodboardaren', icon: '🎨', text: 'Välj i hemlighet en färg. När diskussionen börjar beskriver du gruppen med tre beauty- eller modeord som antyder färgen. Ingen får fråga dig rakt ut vilken färg du valde.' },
+  bråkmakare: { name: 'Catwalk-kaptenen', icon: '👠', text: 'En gång under diskussionen får du ropa “catwalk!” och välja vem som måste prata näst i 20 sekunder. Du får inte förklara varför du valde just den personen.' },
+  sömnig: { name: 'Nagelpoeten', icon: '💅', text: 'Välj en känsla: matt, glittrig eller krom. Inled morgonen med en kort dikt på en mening som förmedlar känslan, men säg aldrig ordet du valde.' },
+  bybo: { name: 'Lookbook-detektiven', icon: '🕵️‍♀️', text: 'Du får ställa en enda stilfråga till valfri spelare, till exempel “Vilken era är du i dag?”. Använd svaret och kroppsspråket för att avgöra vem som bluffar.' }
 };
 
 let hostUid = null;
@@ -57,7 +57,7 @@ async function ensureHostedGame() {
 
 function setup(players = ['Maja', 'Noah', 'Sam', 'Alex'], nextRound = 1) {
   showNewRoundButton(false);
-  shell(`<div class="brand"><span class="brand-mark">✦</span> Midnattsgänget</div><section class="hero"><div class="eyebrow">Ett spel för sena kvällar</div><h1>Vem är <em>inte</em><br>som den säger?</h1><p>Ett snabbspolat bluffspel för kompisgänget. Dela ut de hemliga länkarna, spela en natt och rösta ut någon före frukost.</p></section><section class="card setup"><h2 class="section-title">Starta en omgång</h2><p class="muted">Skriv deltagarnas namn. Var och en får en egen, hemlig länk som fungerar i alla kommande rundor.</p><div id="names"></div><button class="add-link" id="add">＋ lägg till spelare</button><div class="rules"><strong>Så här funkar det:</strong> Du skickar varje länk privat till rätt person. Alla läser sin roll, följer nattfasen tillsammans och diskuterar sedan i grupp innan ni röstar.</div><button class="button pink" id="start">Starta runda ${nextRound} →</button></section>`);
+  shell(`<div class="brand"><span class="brand-mark">✦</span> Blush &amp; Bluff</div><section class="hero"><div class="eyebrow">Ett spel för sena kvällar</div><h1>Vem är <em>inte</em><br>som den säger?</h1><p>Ett snabbspolat bluffspel för kompisgänget. Dela ut de hemliga länkarna, spela en natt och rösta ut någon före frukost.</p></section><section class="card setup"><h2 class="section-title">Starta en omgång</h2><p class="muted">Skriv deltagarnas namn. Var och en får en egen, hemlig länk som fungerar i alla kommande rundor.</p><div id="names"></div><button class="add-link" id="add">＋ lägg till spelare</button><div class="rules"><strong>Så här funkar det:</strong> Du skickar varje länk privat till rätt person. Alla läser sin roll, följer nattfasen tillsammans och diskuterar sedan i grupp innan ni röstar.</div><button class="button pink" id="start">Starta runda ${nextRound} →</button></section>`);
   const names = document.querySelector('#names');
   const add = (value = '') => { const row = document.createElement('div'); row.className = 'player-entry'; row.innerHTML = `<input class="name" maxlength="24" placeholder="Spelarens namn" value="${value}"><button class="icon-btn" aria-label="Ta bort spelare">×</button>`; row.querySelector('button').onclick = () => { if (names.children.length > 3) row.remove(); }; names.append(row); };
   players.forEach(add);
@@ -119,7 +119,7 @@ function lobby(gameId, players, round) {
   const cards = players.map((player, index) => { const url = playerUrl(gameId, player.id); return `<article class="player-card"><div class="avatar">${emojis[index % emojis.length]}</div><h3>${player.name}</h3><p>RUNDA ${round} · Hemlig länk redo</p><div class="card-actions"><button class="button secondary copy" data-url="${url}">Kopiera</button><button class="button open" data-url="${url}">Visa</button></div></article>`; }).join('');
   showNewRoundButton(true);
   newRoundButton.textContent = `Starta runda ${round + 1}`;
-  shell(`<div class="brand"><span class="brand-mark">✦</span> Midnattsgänget <span class="round-label">RUNDA ${round}</span></div><div class="game-top"><div><div class="eyebrow">Omgången är klar</div><h1>Dela ut rollerna</h1></div><span class="count">${players.length} SPELARE</span></div><div class="link-grid">${cards}</div><section class="instructions"><span>🤫</span><div><strong>Skicka länkarna en och en</strong><p>Varje deltagarlänk är permanent. När du startar nästa runda får deltagaren automatiskt sin nya roll när länken öppnas eller laddas om.</p></div></section><div class="footer-action"><button class="button secondary" id="again">← Ändra deltagare</button></div>`);
+  shell(`<div class="brand"><span class="brand-mark">✦</span> Blush &amp; Bluff <span class="round-label">RUNDA ${round}</span></div><div class="game-top"><div><div class="eyebrow">Omgången är klar</div><h1>Dela ut rollerna</h1></div><span class="count">${players.length} SPELARE</span></div><div class="link-grid">${cards}</div><section class="instructions"><span>🤫</span><div><strong>Skicka länkarna en och en</strong><p>Varje deltagarlänk är permanent. När du startar nästa runda får deltagaren automatiskt sin nya roll när länken öppnas eller laddas om.</p></div></section><div class="footer-action"><button class="button secondary" id="again">← Ändra deltagare</button></div>`);
   document.querySelectorAll('.copy').forEach(button => button.onclick = async () => { try { await navigator.clipboard.writeText(button.dataset.url); const old = button.textContent; button.textContent = 'Kopierad!'; setTimeout(() => button.textContent = old, 1400); } catch { prompt('Kopiera länken:', button.dataset.url); } });
   document.querySelectorAll('.open').forEach(button => button.onclick = () => window.open(button.dataset.url, '_blank'));
   document.querySelector('#again').onclick = () => setup(players.map(player => player.name), round + 1);
