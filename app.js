@@ -56,7 +56,7 @@ async function ensureHostedGame() {
 }
 
 function setup(players = ['Maja', 'Noah', 'Sam', 'Alex']) {
-  showNewRoundButton(true);
+  showNewRoundButton(false);
   shell(`<div class="brand"><span class="brand-mark">✦</span> Midnattsgänget</div><section class="hero"><div class="eyebrow">Ett spel för sena kvällar</div><h1>Vem är <em>inte</em><br>som den säger?</h1><p>Ett snabbspolat bluffspel för kompisgänget. Dela ut de hemliga länkarna, spela en natt och rösta ut någon före frukost.</p></section><section class="card setup"><h2 class="section-title">Starta en omgång</h2><p class="muted">Skriv deltagarnas namn. Var och en får en egen, hemlig länk som fungerar i alla kommande rundor.</p><div id="names"></div><button class="add-link" id="add">＋ lägg till spelare</button><div class="rules"><strong>Så här funkar det:</strong> Du skickar varje länk privat till rätt person. Alla läser sin roll, följer nattfasen tillsammans och diskuterar sedan i grupp innan ni röstar.</div><button class="button pink" id="start">Starta runda 1 →</button></section>`);
   const names = document.querySelector('#names');
   const add = (value = '') => { const row = document.createElement('div'); row.className = 'player-entry'; row.innerHTML = `<input class="name" maxlength="24" placeholder="Spelarens namn" value="${value}"><button class="icon-btn" aria-label="Ta bort spelare">×</button>`; row.querySelector('button').onclick = () => { if (names.children.length > 3) row.remove(); }; names.append(row); };
