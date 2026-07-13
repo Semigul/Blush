@@ -55,9 +55,9 @@ async function ensureHostedGame() {
   return hostedGameId;
 }
 
-function setup(players = ['Maja', 'Noah', 'Sam', 'Alex']) {
+function setup(players = ['Maja', 'Noah', 'Sam', 'Alex'], nextRound = 1) {
   showNewRoundButton(false);
-  shell(`<div class="brand"><span class="brand-mark">✦</span> Midnattsgänget</div><section class="hero"><div class="eyebrow">Ett spel för sena kvällar</div><h1>Vem är <em>inte</em><br>som den säger?</h1><p>Ett snabbspolat bluffspel för kompisgänget. Dela ut de hemliga länkarna, spela en natt och rösta ut någon före frukost.</p></section><section class="card setup"><h2 class="section-title">Starta en omgång</h2><p class="muted">Skriv deltagarnas namn. Var och en får en egen, hemlig länk som fungerar i alla kommande rundor.</p><div id="names"></div><button class="add-link" id="add">＋ lägg till spelare</button><div class="rules"><strong>Så här funkar det:</strong> Du skickar varje länk privat till rätt person. Alla läser sin roll, följer nattfasen tillsammans och diskuterar sedan i grupp innan ni röstar.</div><button class="button pink" id="start">Starta runda 1 →</button></section>`);
+  shell(`<div class="brand"><span class="brand-mark">✦</span> Midnattsgänget</div><section class="hero"><div class="eyebrow">Ett spel för sena kvällar</div><h1>Vem är <em>inte</em><br>som den säger?</h1><p>Ett snabbspolat bluffspel för kompisgänget. Dela ut de hemliga länkarna, spela en natt och rösta ut någon före frukost.</p></section><section class="card setup"><h2 class="section-title">Starta en omgång</h2><p class="muted">Skriv deltagarnas namn. Var och en får en egen, hemlig länk som fungerar i alla kommande rundor.</p><div id="names"></div><button class="add-link" id="add">＋ lägg till spelare</button><div class="rules"><strong>Så här funkar det:</strong> Du skickar varje länk privat till rätt person. Alla läser sin roll, följer nattfasen tillsammans och diskuterar sedan i grupp innan ni röstar.</div><button class="button pink" id="start">Starta runda ${nextRound} →</button></section>`);
   const names = document.querySelector('#names');
   const add = (value = '') => { const row = document.createElement('div'); row.className = 'player-entry'; row.innerHTML = `<input class="name" maxlength="24" placeholder="Spelarens namn" value="${value}"><button class="icon-btn" aria-label="Ta bort spelare">×</button>`; row.querySelector('button').onclick = () => { if (names.children.length > 3) row.remove(); }; names.append(row); };
   players.forEach(add);
@@ -118,10 +118,11 @@ async function resetGame() {
 function lobby(gameId, players, round) {
   const cards = players.map((player, index) => { const url = playerUrl(gameId, player.id); return `<article class="player-card"><div class="avatar">${emojis[index % emojis.length]}</div><h3>${player.name}</h3><p>RUNDA ${round} · Hemlig länk redo</p><div class="card-actions"><button class="button secondary copy" data-url="${url}">Kopiera</button><button class="button open" data-url="${url}">Visa</button></div></article>`; }).join('');
   showNewRoundButton(true);
+  newRoundButton.textContent = `Starta runda ${round + 1}`;
   shell(`<div class="brand"><span class="brand-mark">✦</span> Midnattsgänget <span class="round-label">RUNDA ${round}</span></div><div class="game-top"><div><div class="eyebrow">Omgången är klar</div><h1>Dela ut rollerna</h1></div><span class="count">${players.length} SPELARE</span></div><div class="link-grid">${cards}</div><section class="instructions"><span>🤫</span><div><strong>Skicka länkarna en och en</strong><p>Varje deltagarlänk är permanent. När du startar nästa runda får deltagaren automatiskt sin nya roll när länken öppnas eller laddas om.</p></div></section><div class="footer-action"><button class="button secondary" id="again">← Ändra deltagare</button></div>`);
   document.querySelectorAll('.copy').forEach(button => button.onclick = async () => { try { await navigator.clipboard.writeText(button.dataset.url); const old = button.textContent; button.textContent = 'Kopierad!'; setTimeout(() => button.textContent = old, 1400); } catch { prompt('Kopiera länken:', button.dataset.url); } });
   document.querySelectorAll('.open').forEach(button => button.onclick = () => window.open(button.dataset.url, '_blank'));
-  document.querySelector('#again').onclick = () => setup(players.map(player => player.name));
+  document.querySelector('#again').onclick = () => setup(players.map(player => player.name), round + 1);
 }
 
 function renderRoleCard(data) {
@@ -144,4 +145,18 @@ resetGameButton.onclick = resetGame;
 const params = new URLSearchParams(location.hash.slice(1));
 const playerToken = params.get('spelare');
 if (playerToken && playerToken.includes('.')) { const [gameId, playerId] = playerToken.split('.'); playerPage(gameId, playerId); }
-else { const legacy = params.get('roll'); let legacyData = null; try { legacyData = legacy && JSON.parse(decodeURIComponent(escape(atob(legacy)))); } catch {} if (legacyData?.n && legacyData?.r) legacyRolePage(legacyData); else onAuthStateChanged(auth, user => { if (user) { hostUid = user.uid; setup(); } else signInAnonymously(auth).catch(error => { console.error(error); shell('<div class="shell"><p>Kunde inte ansluta till Firebase. Kontrollera att anonym inloggning är aktiverad.</p></div>'); }); }); }
+else { const legacy = params.get('roll'); let legacyData = null; try { legacyData = legacy && JSON.parse(decodeURIComponent(escape(atob(legacy)))); } catch {} if (legacyData?.n && legacyData?.r) legacyRolePage(legacyData); else onAuthStateChanged(auth, user => { if (user) { hostUid = user.uid; restoreHostSetup(); } else signInAnonymously(auth).catch(error => { console.error(error); shell('<div class="shell"><p>Kunde inte ansluta till Firebase. Kontrollera att anonym inloggning är aktiverad.</p></div>'); }); }); }
+
+async function restoreHostSetup() {
+  if (!hostedGameId) return setup();
+  try {
+    const gameSnapshot = await getDoc(gameRef(hostedGameId));
+    if (!gameSnapshot.exists()) return setup();
+    const playerSnapshots = await getDocs(playersRef(hostedGameId));
+    const players = playerSnapshots.docs.map(snapshot => snapshot.data().name).filter(Boolean);
+    setup(players.length >= 3 ? players : undefined, (gameSnapshot.data().round || 0) + 1);
+  } catch (error) {
+    console.error(error);
+    setup();
+  }
+}
