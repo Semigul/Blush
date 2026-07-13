@@ -37,6 +37,7 @@ function gameRef(gameId) { return doc(db, 'games', gameId); }
 function playersRef(gameId) { return collection(db, 'games', gameId, 'players'); }
 function playerRef(gameId, playerId) { return doc(db, 'games', gameId, 'players', playerId); }
 function roleSet(count) { const set = ['ulv', 'siare', 'bråkmakare']; while (set.length < count) set.push(set.length < 5 ? 'sömnig' : 'bybo'); return set.slice(0, count).sort(() => Math.random() - .5); }
+function nextRoleSet(count, previousRoles = []) { if (previousRoles.length !== count) return roleSet(count); let best = roleSet(count); let mostChanges = best.filter((role, index) => role !== previousRoles[index]).length; for (let attempt = 0; attempt < 200 && mostChanges < count; attempt += 1) { const candidate = roleSet(count); const changes = candidate.filter((role, index) => role !== previousRoles[index]).length; if (changes > mostChanges) { best = candidate; mostChanges = changes; } } return best; }
 function showNewRoundButton(show = true) { newRoundButton.classList.toggle('hidden', !show); }
 function hostedPlayerKey(name) { return `blush-bluff:player:${hostedGameId}:${normalizeName(name)}`; }
 function hostedPlayerId(name) { const key = hostedPlayerKey(name); let id = localStorage.getItem(key); if (!id) { id = randomId(); localStorage.setItem(key, id); } return id; }
@@ -67,12 +68,12 @@ function setup(players = ['Maja', 'Noah', 'Sam', 'Alex']) {
   };
 }
 
-async function startRound(names) {
+async function startRound(names, previousRoles = []) {
   try {
     const gameId = await ensureHostedGame();
     const gameSnapshot = await getDoc(gameRef(gameId));
     const round = (gameSnapshot.data()?.round || 0) + 1;
-    const assigned = roleSet(names.length);
+    const assigned = nextRoleSet(names.length, previousRoles);
     const batch = writeBatch(db);
     batch.set(gameRef(gameId), { hostUid, round, updatedAt: serverTimestamp() }, { merge: true });
     const players = names.map((name, index) => ({ id: hostedPlayerId(name), name, role: assigned[index], round }));
@@ -89,9 +90,9 @@ async function nextRound() {
   try {
     const gameId = await ensureHostedGame();
     const snapshots = await getDocs(playersRef(gameId));
-    const players = snapshots.docs.map(snapshot => ({ id: snapshot.id, name: snapshot.data().name }));
+    const players = snapshots.docs.map(snapshot => ({ id: snapshot.id, name: snapshot.data().name, role: snapshot.data().role }));
     if (players.length < 3) return setup();
-    await startRound(players.map(player => player.name));
+    await startRound(players.map(player => player.name), players.map(player => player.role));
   } catch (error) {
     console.error(error);
     alert('Kunde inte starta nästa runda. Kontrollera Firebase-reglerna och försök igen.');
