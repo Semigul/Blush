@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#ff4f9a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Midnattsgänget" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <title>Midnattsgänget — ett socialt spel</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Nunito:wght@500;600;700;800;900&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .round-label { font: 500 10px "DM Mono", monospace; letter-spacing: .08em; color: var(--purple); background: #f3eaff; padding: 6px 8px; border-radius: 8px; }
+      .new-round { position: fixed; top: 20px; right: 22px; z-index: 2; border: 0; border-radius: 12px; padding: 10px 13px; background: #fff; color: #a92460; box-shadow: 0 8px 24px rgba(92,33,69,.12); font: 800 13px Nunito, sans-serif; cursor: pointer; }
+      .new-round:hover { background: #ffe4f0; }
+      @media (max-width: 520px) { .new-round { top: 14px; right: 16px; } }
+    </style>
+  </head>
+  <body>
+    <main id="app"></main>
+    <button class="new-round" id="new-round" type="button">↻ Ny runda</button>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
