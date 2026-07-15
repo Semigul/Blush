@@ -205,15 +205,31 @@ MANUELL (Du i GitHub)
 
 **I VS Code:**
 1. Öppna **Copilot Chat** (Cmd+Shift+I på Mac, eller sidebar)
-2. Kopiera **story-texten** från GitHub-kommentaren
-3. Skapa en prompt för Copilot, t.ex:
+
+2. **Två sätt att få story-texten:**
+
+   **Sätt A: Använd `@github` referens (enklaste)**
    ```
-   Baserat på denna story:
-   [PASTE STORY TEXT HERE]
+   @github #8 Implementera denna story för mig
+   ```
+   Copilot läser då hela issue #8 och kan se story-texten direkt.
    
-   Generera TypeScript-kod för att implementera detta.
-   Använd befintlig filstruktur och stilar.
+   > 💡 **Kräver:** GitHub Pull Requests and Issues extension (redan installerad)
+
+   **Sätt B: Kopiera-klistra in (om sätt A inte fungerar)**
+   - Gå till GitHub-issue #8
+   - Kopiera story-texten från Issue-body
+   - Klistra in i Copilot Chat
+
+3. Skriv din implementerings-prompt, t.ex:
    ```
+   @github #8
+   
+   Implementera denna story.
+   Skriv TypeScript-kod.
+   Använd befintlig filstruktur.
+   ```
+
 4. Låt Copilot generera kod
 5. Implementera ändringarna i din kodbas
 6. Testa lokalt:
