@@ -132,7 +132,7 @@ if (mode === 'implement') {
   }
 
   const prompt = `Du är en coding agent för en statisk GitHub Pages-webbplats.
-Implementera issuen genom att svara med en enda giltig unified diff som kan appliceras med git apply.
+Implementera issuen genom att beskriva exakta sök-och-ersätt-ändringar.
 
 Titel: ${issue.title}
 
@@ -147,47 +147,77 @@ ${source.join('\n')}
 --- END REPOSITORY DATA ---
 
 Regler:
-- Svara endast med diffen, utan Markdown-staket eller förklaring.
+- Svara endast med giltig JSON, utan Markdown-staket eller förklaring.
+- Använd exakt formen {"edits":[{"path":"app.js","search":"exakt befintlig text","replace":"ny text"}]}.
+- Varje search-värde måste kopieras ordagrant från repositorydata och vara unikt i filen.
+- Ta med tillräckligt mycket omgivande text i search för att göra träffen unik.
+- Använd 1 till 8 små edits. Returnera aldrig en tom edits-lista.
 - Ändra endast filer som visas i repositorydata ovan.
 - Ändra aldrig .github, workflows, hemligheter eller repository-inställningar.
 - Gör minsta sammanhängande ändring som uppfyller acceptanskriterierna.
 - Behåll lösningen statisk och kompatibel med GitHub Pages.
 - Använd inga nya paket eller byggsteg.`;
 
-  function normalizePatch(response) {
-    let value = response.trim();
-    value = value.replace(/^```(?:diff|patch)?\s*/i, '').replace(/\s*```\s*$/i, '');
+  function parseEdits(response) {
+    const firstBrace = response.indexOf('{');
+    const lastBrace = response.lastIndexOf('}');
+    if (firstBrace < 0 || lastBrace <= firstBrace) throw new Error('Svaret innehåller inget JSON-objekt.');
+    const parsed = JSON.parse(response.slice(firstBrace, lastBrace + 1));
+    if (!Array.isArray(parsed.edits) || parsed.edits.length < 1 || parsed.edits.length > 8) {
+      throw new Error('JSON måste innehålla 1 till 8 edits.');
+    }
+    return parsed.edits;
+  }
 
-    const gitDiffStart = value.search(/^diff --git /m);
-    if (gitDiffStart >= 0) value = value.slice(gitDiffStart);
-    else {
-      const unifiedDiffStart = value.search(/^--- a\//m);
-      if (unifiedDiffStart >= 0) value = value.slice(unifiedDiffStart);
+  async function validateEdits(edits) {
+    const workingFiles = new Map();
+    const changedPaths = new Set();
+
+    for (const [index, edit] of edits.entries()) {
+      if (!edit || typeof edit.path !== 'string' || typeof edit.search !== 'string' || typeof edit.replace !== 'string') {
+        throw new Error(`Edit ${index + 1} saknar path, search eller replace.`);
+      }
+      if (!sourceFiles.includes(edit.path)) throw new Error(`Otillåten fil i edit ${index + 1}: ${edit.path}`);
+      if (!edit.search || edit.search === edit.replace) throw new Error(`Edit ${index + 1} är tom eller ändrar ingenting.`);
+
+      const current = workingFiles.has(edit.path)
+        ? workingFiles.get(edit.path)
+        : await readFile(edit.path, 'utf8');
+      const occurrences = current.split(edit.search).length - 1;
+      if (occurrences !== 1) {
+        throw new Error(`Edit ${index + 1} search måste förekomma exakt en gång i ${edit.path}, men förekom ${occurrences} gånger.`);
+      }
+
+      workingFiles.set(edit.path, current.replace(edit.search, edit.replace));
+      changedPaths.add(edit.path);
     }
 
-    return value.replace(/\n```[\s\S]*$/i, '').trim() + '\n';
+    return { workingFiles, changedPaths };
   }
 
-  function isUnifiedDiff(value) {
-    const hasHeader = value.startsWith('diff --git ') || /^--- a\/[^\n]+\n\+\+\+ b\//.test(value);
-    const hasFileMarkers = /^--- (?:a\/[^\n]+|\/dev\/null)$/m.test(value)
-      && /^\+\+\+ (?:b\/[^\n]+|\/dev\/null)$/m.test(value);
-    const hasHunk = /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/m.test(value);
-    return hasHeader && hasFileMarkers && hasHunk;
+  let lastError;
+  let response;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    const retryInstruction = attempt === 1
+      ? ''
+      : `\n\nFÖREGÅENDE SVAR KUNDE INTE APPLICERAS: ${lastError.message}\nFörsök igen med korta, exakta och unika search-värden kopierade ordagrant från repositorydata.`;
+    response = await callModel(prompt + retryInstruction);
+
+    try {
+      const edits = parseEdits(response);
+      const { workingFiles, changedPaths } = await validateEdits(edits);
+      for (const path of changedPaths) await writeFile(path, workingFiles.get(path));
+      console.log(`Applicerade ${edits.length} validerade edits i ${changedPaths.size} filer.`);
+      lastError = null;
+      break;
+    } catch (error) {
+      lastError = error;
+      console.error(`Modellförsök ${attempt} kunde inte appliceras: ${error.message}`);
+    }
   }
 
-  let rawResponse = await callModel(prompt);
-  let patch = normalizePatch(rawResponse);
-
-  if (!isUnifiedDiff(patch)) {
-    rawResponse = await callModel(`${prompt}\n\nVIKTIGT: Ditt föregående svar var inte en applicerbar unified diff. Försök igen. Första raden måste vara exakt i formatet "diff --git a/sökväg b/sökväg". Varje filändring måste innehålla raderna "--- a/sökväg", "+++ b/sökväg" och minst ett riktigt hunk-huvud i formatet "@@ -gammalrad,antal +nyrad,antal @@" följt av ändrade kodrader. Skriv ingen inledning, sammanfattning, platshållare eller Markdown.`);
-    patch = normalizePatch(rawResponse);
+  if (lastError) {
+    await writeFile('agent-response.txt', response || 'Tomt svar');
+    throw new Error(`Modellen kunde inte skapa validerade filändringar efter två försök: ${lastError.message}`);
   }
-
-  if (!isUnifiedDiff(patch)) {
-    await writeFile('agent-response.txt', rawResponse);
-    console.error('Modellens svar började med:', rawResponse.slice(0, 500));
-    throw new Error('Modellen returnerade inte en giltig git-diff efter två försök.');
-  }
-  await writeFile('agent.patch', patch);
 }
