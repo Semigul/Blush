@@ -1,0 +1,85 @@
+name: Agent – implementera story
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: implement-agent-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  implement:
+    if: github.event.label.name == 'agent:implement'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+      models: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Skapa arbetsbranch
+        id: branch
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          RUN_ID: ${{ github.run_id }}
+        run: |
+          BRANCH="agent/issue-${ISSUE_NUMBER}-${RUN_ID}"
+          git switch -c "$BRANCH"
+          echo "name=$BRANCH" >> "$GITHUB_OUTPUT"
+
+      - name: Skapa implementation med GitHub Models
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node .github/scripts/github-model-agent.mjs implement
+          git apply --check agent.patch
+          git apply agent.patch
+          rm agent.patch
+
+      - name: Kontrollera agentens ändringar
+        run: |
+          if ! git diff --quiet -- .github/workflows; then
+            echo "Agenten försökte ändra workflow-filer. Körningen stoppas."
+            exit 1
+          fi
+          node --check app.js
+          node --input-type=module -e "JSON.parse(await (await import('node:fs/promises')).readFile('manifest.webmanifest', 'utf8'))"
+          test -f index.html
+          test -f styles.css
+          test -f service-worker.js
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "Agenten skapade inga ändringar."
+            exit 1
+          fi
+
+      - name: Commit och push
+        env:
+          BRANCH: ${{ steps.branch.outputs.name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Implement issue #${ISSUE_NUMBER}"
+          git push --set-upstream origin "$BRANCH"
+
+      - name: Skapa pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ steps.branch.outputs.name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+        run: |
+          PR_URL=$(gh pr create \
+            --base main \
+            --head "$BRANCH" \
+            --title "Implementera #${ISSUE_NUMBER}: ${ISSUE_TITLE}" \
+            --body "Closes #${ISSUE_NUMBER}\n\nSkapad automatiskt från den godkända storyn av agent-workflowet.")
+          gh issue edit "$ISSUE_NUMBER" --remove-label "agent:implement" --add-label "agent:in-review"
+          gh issue comment "$ISSUE_NUMBER" --body "Pull request skapad: $PR_URL"
