@@ -17,36 +17,8 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            const story = `# ${issue.title}
-
-## Mål
-${issue.body || 'Beskriv här vad målet är'}
-
-## Bakgrund
-Varför behöver vi detta? Vad är kontexten?
-
-## Omfattning
-Vad ingår i denna task?
-
-## Utanför omfattning
-Vad ingår INTE? Vad är sparkat för senare?
-
-## Acceptanskriterier
-- [ ] Kriterium 1
-- [ ] Kriterium 2
-- [ ] Kriterium 3
-
-## Testplan
-Hur testar vi att detta fungerar?
-
-## Risker
-Vilka risker finns? Vad kan gå fel?
-
-## Öppna frågor
-- Fråga 1?
-- Fråga 2?
-`;
-
+            const story = '# ' + issue.title + '\n\n## Mal\n' + (issue.body || 'Beskriv målet') + '\n\n## Bakgrund\nVarför behöver vi detta?\n\n## Omfattning\nVad ingår?\n\n## Utanför omfattning\nVad ingår INTE?\n\n## Acceptanskriterier\n- Kriterium 1\n- Kriterium 2\n- Kriterium 3\n\n## Testplan\nHur testar vi detta?\n\n## Risker\nVilka risker finns?\n\n## Oppna fragor\n- Fråga?';
+            
             await github.rest.issues.update({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -58,7 +30,7 @@ Vilka risker finns? Vad kan gå fel?
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              body: 'Story Architect har genererat en basstruktur! Granska och uppdatera delen som behover justeras, sedan lag etiketten "story" nar du ar nojd.'
+              body: 'Story genererad! Granska och uppdatera delar som behover justering. Lag sedan etiketten "story".'
             });
 
             await github.rest.issues.addLabels({
