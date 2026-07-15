@@ -17,10 +17,16 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            const msg = 'Implementeringsagent aktiverad for Issue #' + issue.number + '\n\nImplementera detta i VS Code med Copilot:\n' + issue.body;
+            const msg = 'Implementeringsagent aktiverad for Issue #' + issue.number + '\n\nStory:\n' + issue.body + '\n\nImplementera detta i VS Code med Copilot. Nar du ar klar:\n1. Skapa en ny branch: git switch -c implement/issue-' + issue.number + '\n2. Committa: git add -A && git commit -m "Implementera story #' + issue.number + '"\n3. Pusha: git push origin implement/issue-' + issue.number + '\n4. Skapa en PR pa GitHub';
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
               body: msg
+            });
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['awaiting-implementation']
             });

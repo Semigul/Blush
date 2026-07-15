@@ -18,7 +18,7 @@ jobs:
         with:
           script: |
             const pr = context.payload.pull_request;
-            const msg = 'Review-agent aktiverad for PR #' + pr.number + '\n\nGranska denna kod med Copilot: Buggar? Security-risker? Regressioner?';
+            const msg = 'Review-agent aktiverad for PR #' + pr.number + '\n\nGranska denna kod med Copilot Chat:\n- Finns det buggar?\n- Security-risker?\n- Regressioner?\n- Saknade tester?\n\nKommentera med resultatet har.';
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,

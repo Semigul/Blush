@@ -17,10 +17,53 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            const msg = 'Story Architect aktiverad for Issue #' + issue.number + '\n\nKopiera denna prompt till Copilot i VS Code:\n\nSkapa en komplett story med: Mal, Bakgrund, Omfattning, Acceptanskriterier, Testplan, Risker, Oppna fragor\n\nIdea: ' + issue.title;
+            const story = `# ${issue.title}
+
+## Mål
+${issue.body || 'Beskriv här vad målet är'}
+
+## Bakgrund
+Varför behöver vi detta? Vad är kontexten?
+
+## Omfattning
+Vad ingår i denna task?
+
+## Utanför omfattning
+Vad ingår INTE? Vad är sparkat för senare?
+
+## Acceptanskriterier
+- [ ] Kriterium 1
+- [ ] Kriterium 2
+- [ ] Kriterium 3
+
+## Testplan
+Hur testar vi att detta fungerar?
+
+## Risker
+Vilka risker finns? Vad kan gå fel?
+
+## Öppna frågor
+- Fråga 1?
+- Fråga 2?
+`;
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: story
+            });
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              body: msg
+              body: 'Story Architect har genererat en basstruktur! Granska och uppdatera delen som behover justeras, sedan lag etiketten "story" nar du ar nojd.'
+            });
+
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['awaiting-story-review']
             });
