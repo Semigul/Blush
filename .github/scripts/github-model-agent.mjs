@@ -78,10 +78,54 @@ if (mode === 'implement') {
     'icon.svg'
   ];
   const source = [];
+  const maxContextCharacters = 22_000;
+  const stopWords = new Set([
+    'acceptanskriterier', 'agent', 'användare', 'bakgrund', 'detta', 'eller',
+    'finns', 'frågor', 'inte', 'issue', 'klicka', 'mål', 'någon', 'omfattning',
+    'rollen', 'ska', 'story', 'testplan', 'user', 'utanför', 'webbplatsen', 'vill'
+  ]);
+  const keywords = [...new Set(`${issue.title}\n${issue.body || ''}`
+    .toLowerCase()
+    .match(/[\p{L}\p{N}_-]{4,}/gu) || [])]
+    .filter(word => !stopWords.has(word))
+    .slice(0, 30);
+
+  function relevantExcerpts(path, content) {
+    const lines = content.split('\n');
+    const matches = lines
+      .map((line, index) => ({
+        index,
+        score: keywords.reduce((score, word) => score + (line.toLowerCase().includes(word) ? 1 : 0), 0)
+      }))
+      .filter(match => match.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 10)
+      .sort((a, b) => a.index - b.index);
+
+    if (matches.length === 0) {
+      return `\n--- FILE START: ${path} ---\n${lines.slice(0, 50).join('\n')}`;
+    }
+
+    const ranges = [];
+    for (const match of matches) {
+      const start = Math.max(0, match.index - 35);
+      const end = Math.min(lines.length, match.index + 36);
+      const previous = ranges.at(-1);
+      if (previous && start <= previous.end + 10) previous.end = Math.max(previous.end, end);
+      else ranges.push({ start, end });
+    }
+
+    return ranges
+      .map(({ start, end }) => `\n--- EXCERPT: ${path} lines ${start + 1}-${end} ---\n${lines.slice(start, end).join('\n')}`)
+      .join('\n');
+  }
 
   for (const path of sourceFiles) {
     try {
-      source.push(`\n--- FILE: ${path} ---\n${await readFile(path, 'utf8')}`);
+      const excerpt = relevantExcerpts(path, await readFile(path, 'utf8'));
+      const remaining = maxContextCharacters - source.join('\n').length;
+      if (remaining <= 0) break;
+      source.push(excerpt.slice(0, remaining));
     } catch (error) {
       if (error.code !== 'ENOENT') throw error;
     }
