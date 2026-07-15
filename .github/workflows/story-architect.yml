@@ -17,87 +17,280 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            const title = issue.title.toLowerCase();
-            const body = issue.body || '';
-            
-            // Intelligentanalys av issue-titeln
-            function analyzeAndRefine() {
-              let mal = '';
-              let background = '';
-              let scope = '';
-              let outOfScope = '';
-              let criteria = [];
-              let testPlan = '';
-              let risks = [];
-              
-              // Detektera issue-typ och generera relevant innehål
-              if (title.includes('ta bort') || title.includes('radera') || title.includes('ta') && title.includes('bort')) {
-                mal = 'Reducera komplexitet och förbättra användarupplevelse genom att ta bort överflödig eller redundant information.';
-                background = 'Det finns för mycket information eller visuella element som distraherar från det primära syftet. En förenkling förbättrar UX och prestanda.';
-                scope = 'Granska befintligt innehål/design, identifiera överflödig text/element, ta bort utan att påverka funktionalitet.';
-                outOfScope = 'Att omdesigna layouten eller ändra övriga funktioner.';
-                criteria = ['Överflödig text/element borttagen', 'Viktigt innehål kvarstår', 'Ingen funktionalitet påverkad', 'Tester passerar'];
-                testPlan = 'Visuell granskning av resultat, regression testing av relaterad funktionalitet, användartestning för att verifiera förbättrad klarhet.';
-                risks = ['Risk: Viktigt innehål tas bort av misstag', 'Risk: Bruten layout om element är beroende'];
-              } else if (title.includes('lägga till') || title.includes('ny') || title.includes('implementera')) {
-                mal = 'Implementera ny funktionalitet eller feature för att tillgodose användarnas behov.';
-                background = 'Denna feature kommer att förbättra produkten genom att ' + body.substring(0, 50) + '...';
-                scope = 'Implementering av ny feature inklusive testning och dokumentation.';
-                outOfScope = 'Ändringar av befintlig funktionalitet eller design.';
-                criteria = ['Feature implementerad enligt spec', 'Alla tests grönmarkerade', 'Dokumenterad', 'Code reviewed'];
-                testPlan = 'Unit tests, integration tests, manuell testning av use cases, edge case testing.';
-                risks = ['Risk: Performance impact', 'Risk: Incompatibility med befintlig kod'];
-              } else if (title.includes('fixa') || title.includes('bug') || title.includes('fel')) {
-                mal = 'Åtgärda buggen för att återställa funktionalitet och förbättra stabilitet.';
-                background = 'En bug upptäcktes som ' + body.substring(0, 50) + '... Detta påverkar användaren negativt.';
-                scope = 'Identifiera rotorsak, applicera fix, validera att buggen är löst.';
-                outOfScope = 'Större refactorering eller designändringar.';
-                criteria = ['Bug reproducerad', 'Rootcause identifierad och dokumenterad', 'Fix applicerad', 'Tests passerar', 'Ingen regression'];
-                testPlan = 'Reproducera buggen, verifiera fix löser problemet, regression testing, edge case testing.';
-                risks = ['Risk: Fix introducerar ny bug', 'Risk: Inte tillräcklig testning'];
-              } else if (title.includes('refactor') || title.includes('omstruktur') || title.includes('uppdatera')) {
-                mal = 'Förbättra kodkvalitet och maintainability utan att ändra funktionalitet.';
-                background = 'Nuvarande kod behöver refaktoreras för ' + body.substring(0, 50) + '... för att förbättra läsbarhet och maintainability.';
-                scope = 'Refaktoring av relevant kod, uppdatering av tests, ingen funktionalitetsförändring.';
-                outOfScope = 'Nya features eller design-ändringar.';
-                criteria = ['Kod refaktorerad', 'Tests passerar oförändrade', 'Improved readability', 'Code review approved'];
-                testPlan = 'Körning av befintlig testsuite, manuell verifiering att beteende är identiskt, performance testing.';
-                risks = ['Risk: Oavsiktlig funktionalitetsförändring', 'Risk: Test-failures'];
-              } else {
-                // Default generic story
-                mal = body.substring(0, 100) || 'Beskriv målet för denna task';
-                background = 'Varför behöver vi detta?';
-                scope = 'Vad ingår i denna task?';
-                outOfScope = 'Vad ingår INTE?';
-                criteria = ['Acceptance criterion 1', 'Acceptance criterion 2'];
-                testPlan = 'Beskriv testning som behövs';
-                risks = ['Potentiell risk 1'];
+            const rawTitle = issue.title || '';
+            const rawBody = issue.body || '';
+
+            function cleanText(text) {
+              return (text || '')
+                .replace(/\r/g, '')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+            }
+
+            function removeIdeaPrefix(title) {
+              return title.replace(/^\s*id[eé]\s*:\s*/i, '').trim();
+            }
+
+            function extractIdeaFromIssueForm(body) {
+              if (!body) return '';
+
+              // Om issue redan har expanderats tidigare ska vi inte återanvända hela storyn som input.
+              if (/^#\s+/m.test(body) && /##\s+(Mål|Mal|User Story|Acceptanskriterier)/i.test(body)) {
+                return '';
               }
-              
+
+              // Issue forms brukar renderas som markdown-sektioner med ### Rubrik.
+              const headingMatch = body.match(/###\s*Din idé\s*\n+([\s\S]*?)(?:\n###\s|$)/i);
+              if (headingMatch && headingMatch[1]) {
+                return cleanText(headingMatch[1]);
+              }
+
+              // Fallback: ta första meningsfulla raden om ingen issue-form-rubrik hittas.
+              const firstUsefulLine = body
+                .split('\n')
+                .map(line => line.trim())
+                .find(line => line && !line.startsWith('#') && !line.startsWith('-') && !line.startsWith('>'));
+              if (firstUsefulLine) {
+                return firstUsefulLine;
+              }
+
+              return cleanText(body);
+            }
+
+            function inferType(text) {
+              const t = text.toLowerCase();
+
+              if (/\b(fixa|bug|fel|krasch|error|problem|trasig|fungerar inte)\b/.test(t)) return 'bugfix';
+              if (/\b(refactor|refaktor|omstruktur|städa|cleanup|modernisera)\b/.test(t)) return 'refactor';
+              if (/\b(ta bort|radera|plocka bort|remove|dölj)\b/.test(t)) return 'cleanup';
+              if (/\b(lägg till|lägga till|implementera|skapa|inför|stöd för|ny)\b/.test(t)) return 'feature';
+              return 'improvement';
+            }
+
+            function snippet(text, max = 160) {
+              const value = cleanText(text);
+              if (!value) return '';
+              return value.length <= max ? value : value.slice(0, max - 1).trimEnd() + '…';
+            }
+
+            function extractMainSubject(text) {
+              const value = cleanText(text).replace(/[.!?]+$/, '');
+              if (!value) return 'den berörda delen av produkten';
+
+              const lowered = value.toLowerCase();
+              const withoutPrefix = lowered
+                .replace(/^jag vill\s+att\s+/, '')
+                .replace(/^jag vill\s+/, '')
+                .replace(/^vi vill\s+/, '')
+                .replace(/^att\s+/, '');
+
+              return snippet(withoutPrefix, 90) || 'den berörda delen av produkten';
+            }
+
+            function buildUserStory(kind, subject) {
+              if (kind === 'bugfix') {
+                return `Som användare vill jag att ${subject} fungerar korrekt så att jag kan slutföra flödet utan fel.`;
+              }
+              if (kind === 'refactor') {
+                return `Som utvecklare vill jag att ${subject} har tydlig och underhållbar struktur så att förändringar kan göras snabbare och säkrare.`;
+              }
+              if (kind === 'cleanup') {
+                return `Som användare vill jag att ${subject} är avskalat och tydligt så att jag snabbare förstår vad jag ska göra.`;
+              }
+              return `Som användare vill jag kunna använda ${subject} så att jag kan nå mitt mål utan workaround.`;
+            }
+
+            function asGherkinCriteria(kind, subject, criteria) {
+              const intro = [];
+
+              if (kind === 'bugfix') {
+                intro.push(`Given att felet i ${subject} är reproducerat`);
+                intro.push('When användaren utför det tidigare felande flödet');
+                intro.push('Then ska felet inte uppstå och förväntat resultat visas');
+              } else if (kind === 'feature') {
+                intro.push(`Given att användaren har tillgång till ${subject}`);
+                intro.push('When användaren genomför huvudflödet enligt tänkt användning');
+                intro.push('Then ska resultatet motsvara beskriven nytta utan manuella workaround');
+              } else if (kind === 'cleanup') {
+                intro.push(`Given att användaren öppnar ${subject}`);
+                intro.push('When användaren utför huvuduppgiften');
+                intro.push('Then ska flödet vara tydligare med färre överflödiga steg eller element');
+              } else if (kind === 'refactor') {
+                intro.push(`Given att ${subject} är refaktorerad`);
+                intro.push('When befintliga tester och huvudflöden körs');
+                intro.push('Then ska funktionellt beteende vara oförändrat');
+              } else {
+                intro.push(`Given att användaren använder ${subject}`);
+                intro.push('When huvudflödet körs från start till mål');
+                intro.push('Then ska nyttan i storyn uppfyllas med verifierbart resultat');
+              }
+
+              const detailed = criteria.map((c, i) => `${i + 1}. ${c}`);
+              return [...intro, ...detailed].map(item => '- ' + item);
+            }
+
+            function buildStoryData(kind, ideaText, summaryTitle) {
+              const subject = extractMainSubject(ideaText || summaryTitle);
+              const source = snippet(ideaText || summaryTitle, 180);
+
+              if (kind === 'cleanup') {
+                return {
+                  mal: `Förenkla ${subject} genom att ta bort sådant som inte skapar värde för användaren.`,
+                  background: `Nuvarande upplägg upplevs som onödigt tungt eller rörigt. Idéunderlag: "${source}".`,
+                  scope: `Identifiera överflödiga element i ${subject}, ta bort dem och verifiera att befintligt huvudflöde fungerar som tidigare.`,
+                  outOfScope: 'Visuell redesign av hela gränssnittet eller nya funktioner utanför den avgränsade ytan.',
+                  criteria: [
+                    `Överflödiga delar i ${subject} är borttagna.`,
+                    'Det primära användarflödet fungerar utan förändrat beteende.',
+                    'Ingen regression i närliggande funktionalitet.'
+                  ],
+                  testPlan: `Manuell genomgång av ${subject} före/efter samt regressionstest av närliggande flöden.`,
+                  risks: [
+                    'Viktigt innehåll kan tas bort av misstag.',
+                    'Beroenden till borttagna element kan ge oväntade UI-problem.'
+                  ],
+                  openQuestions: [
+                    `Vilka delar i ${subject} är absolut kritiska att behålla?`,
+                    'Finns statistik eller feedback som styr vad som ska bort först?'
+                  ]
+                };
+              }
+
+              if (kind === 'feature') {
+                return {
+                  mal: `Leverera stöd för ${subject} så att användaren kan lösa sitt behov utan workaround.`,
+                  background: `En ny förmåga efterfrågas av användare/produkt. Idéunderlag: "${source}".`,
+                  scope: `Implementera ${subject} end-to-end inklusive nödvändiga uppdateringar i UI, logik och grundläggande dokumentation.`,
+                  outOfScope: 'Större omtag av arkitektur eller funktioner som inte krävs för att leverera kärnnyttan.',
+                  criteria: [
+                    `${subject} går att använda i avsett flöde.`,
+                    'Felhantering finns för vanliga edge cases.',
+                    'Dokumentation eller hjälptext uppdaterad där det behövs.'
+                  ],
+                  testPlan: 'Enhetstester för ny logik, manuell verifikation av huvudflödet samt test av minst två edge cases.',
+                  risks: [
+                    'Ökad komplexitet kan påverka underhållbarhet.',
+                    'Delar av befintligt flöde kan få sidoeffekter.'
+                  ],
+                  openQuestions: [
+                    'Vilken miniminivå av beteende krävs för första leverans?',
+                    'Behöver detta flaggas bakom feature toggle?'
+                  ]
+                };
+              }
+
+              if (kind === 'bugfix') {
+                return {
+                  mal: `Åtgärda felet i ${subject} så att förväntat beteende återställs stabilt.`,
+                  background: `Ett fel påverkar användarupplevelsen eller funktionaliteten. Rapporterat underlag: "${source}".`,
+                  scope: `Reproducera felet, identifiera rotorsak, implementera fix och säkra mot regression.`,
+                  outOfScope: 'Stora refaktoreringar som inte krävs för att åtgärda den identifierade rotorsaken.',
+                  criteria: [
+                    'Felet är reproducerat och dokumenterat innan fix.',
+                    'Fixen eliminerar felet i verifierad testmiljö.',
+                    'Regressionstest visar att närliggande beteende är intakt.'
+                  ],
+                  testPlan: 'Definiera reproduktionssteg, verifiera fix med samma steg och kör regressionstest på närliggande flöden.',
+                  risks: [
+                    'Fixen kan maskera symptom utan att lösa rotorsaken.',
+                    'Ofullständig testning kan släppa igenom regressioner.'
+                  ],
+                  openQuestions: [
+                    'Kan felet återskapas konsekvent och i vilka miljöer?',
+                    'Behövs extra logging/monitoring efter release?'
+                  ]
+                };
+              }
+
+              if (kind === 'refactor') {
+                return {
+                  mal: `Förbättra kodens kvalitet i ${subject} utan att ändra funktionellt beteende.`,
+                  background: `Nuvarande implementation är svår att förstå eller vidareutveckla. Underlag: "${source}".`,
+                  scope: `Refaktorera berörd kod, förenkla struktur/namngivning och säkerställ att befintliga tester fortsätter passera.`,
+                  outOfScope: 'Nya features eller medvetna beteendeförändringar.',
+                  criteria: [
+                    'Kod i berört område är mer läsbar och konsekvent.',
+                    'Befintligt beteende är oförändrat i verifierade scenarion.',
+                    'Automatiska tester passerar efter refaktorering.'
+                  ],
+                  testPlan: 'Kör full testsuite samt manuell kontroll av kritiska användarflöden i berörd modul.',
+                  risks: [
+                    'Oavsiktliga beteendeförändringar kan introduceras.',
+                    'Refaktorering utan tillräckliga tester kan skapa dolda fel.'
+                  ],
+                  openQuestions: [
+                    'Vilka delar ger störst underhållsvinst att ta först?',
+                    'Behöver vi dela upp refaktoreringen i flera mindre PR:ar?'
+                  ]
+                };
+              }
+
               return {
-                mal: mal,
-                background: background,
-                scope: scope,
-                outOfScope: outOfScope,
-                criteria: criteria,
-                testPlan: testPlan,
-                risks: risks
+                mal: `Förtydliga och leverera förbättringen "${snippet(summaryTitle, 90)}" med tydlig användarnytta.`,
+                background: `Idén behöver brytas ned till konkret leverans. Underlag: "${source}".`,
+                scope: `Beskriv och implementera den minsta sammanhängande lösningen för ${subject}, inklusive verifiering.`,
+                outOfScope: 'Större sidospår som inte krävs för att nå målet i denna story.',
+                criteria: [
+                  'Lösningen är avgränsad och tydligt beskriven.',
+                  'Definition of done och verifiering är explicit.',
+                  'Eventuella beroenden eller antaganden är dokumenterade.'
+                ],
+                testPlan: 'Manuell verifiering av huvudflöde samt riktade tester för den del som ändras.',
+                risks: [
+                  'Otydlig scope kan leda till för stor implementation.',
+                  'Dolda beroenden kan påverka planerad leveranstid.'
+                ],
+                openQuestions: [
+                  'Vilken del ger störst nytta att leverera först?',
+                  'Finns beroenden till andra stories/tekniska beslut?'
+                ]
               };
             }
-            
-            const story_data = analyzeAndRefine();
-            const criteria_text = story_data.criteria.map(c => '- ' + c).join('\n');
-            const risks_text = story_data.risks.map(r => '- ' + r).join('\n');
-            
-            const story = '# ' + issue.title + '\n\n' +
-              '## Mal\n' + story_data.mal + '\n\n' +
-              '## Bakgrund\n' + story_data.background + '\n\n' +
-              '## Omfattning\n' + story_data.scope + '\n\n' +
-              '## Utanfor omfattning\n' + story_data.outOfScope + '\n\n' +
-              '## Acceptanskriterier\n' + criteria_text + '\n\n' +
-              '## Testplan\n' + story_data.testPlan + '\n\n' +
-              '## Risker\n' + risks_text + '\n\n' +
-              '## Oppna fragor\n- ?';
+
+            const titleWithoutPrefix = removeIdeaPrefix(rawTitle);
+            const ideaText = extractIdeaFromIssueForm(rawBody);
+            const alreadyExpanded = /##\s+(Mål|Mal|User Story|Acceptanskriterier)/i.test(rawBody || '');
+
+            if (alreadyExpanded) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: 'Story Architect hoppade över ny expansion eftersom issue redan innehåller en story-struktur. Ta bort etiketten `story:expand` och skapa en ny one-liner issue för ny expansion.'
+              });
+
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                name: 'story:expand'
+              }).catch(() => {});
+
+              return;
+            }
+
+            const analysisText = `${titleWithoutPrefix}\n${ideaText}`;
+            const kind = inferType(analysisText);
+            const storyData = buildStoryData(kind, ideaText, titleWithoutPrefix || rawTitle);
+            const subject = extractMainSubject(ideaText || titleWithoutPrefix || rawTitle);
+            const userStory = buildUserStory(kind, subject);
+
+            const criteriaText = asGherkinCriteria(kind, subject, storyData.criteria).join('\n');
+            const risksText = storyData.risks.map(r => '- ' + r).join('\n');
+            const openQuestionsText = storyData.openQuestions.map(q => '- ' + q).join('\n');
+            const summary = snippet(ideaText || titleWithoutPrefix || rawTitle, 220);
+
+            const story = '# ' + (titleWithoutPrefix || rawTitle) + '\n\n' +
+              '## Sammanfattning\n' + summary + '\n\n' +
+              '## User Story\n' + userStory + '\n\n' +
+              '## Mål\n' + storyData.mal + '\n\n' +
+              '## Bakgrund\n' + storyData.background + '\n\n' +
+              '## Omfattning\n' + storyData.scope + '\n\n' +
+              '## Utanför omfattning\n' + storyData.outOfScope + '\n\n' +
+              '## Acceptanskriterier\n' + criteriaText + '\n\n' +
+              '## Testplan\n' + storyData.testPlan + '\n\n' +
+              '## Risker\n' + risksText + '\n\n' +
+              '## Öppna frågor\n' + openQuestionsText;
             
             await github.rest.issues.update({
               owner: context.repo.owner,
@@ -119,3 +312,10 @@ jobs:
               issue_number: issue.number,
               labels: ['awaiting-story-review']
             });
+
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              name: 'story:expand'
+            }).catch(() => {});
