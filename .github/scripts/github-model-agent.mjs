@@ -154,8 +154,36 @@ Regler:
 - Behåll lösningen statisk och kompatibel med GitHub Pages.
 - Använd inga nya paket eller byggsteg.`;
 
-  let patch = await callModel(prompt);
-  patch = patch.replace(/^```(?:diff)?\s*/i, '').replace(/\s*```$/, '').trim() + '\n';
-  if (!patch.startsWith('diff --git ')) throw new Error('Modellen returnerade inte en giltig git-diff.');
+  function normalizePatch(response) {
+    let value = response.trim();
+    value = value.replace(/^```(?:diff|patch)?\s*/i, '').replace(/\s*```\s*$/i, '');
+
+    const gitDiffStart = value.search(/^diff --git /m);
+    if (gitDiffStart >= 0) value = value.slice(gitDiffStart);
+    else {
+      const unifiedDiffStart = value.search(/^--- a\//m);
+      if (unifiedDiffStart >= 0) value = value.slice(unifiedDiffStart);
+    }
+
+    return value.replace(/\n```[\s\S]*$/i, '').trim() + '\n';
+  }
+
+  function isUnifiedDiff(value) {
+    return value.startsWith('diff --git ') || /^--- a\/[^\n]+\n\+\+\+ b\//.test(value);
+  }
+
+  let rawResponse = await callModel(prompt);
+  let patch = normalizePatch(rawResponse);
+
+  if (!isUnifiedDiff(patch)) {
+    rawResponse = await callModel(`${prompt}\n\nVIKTIGT: Ditt föregående svar var inte en unified diff. Försök igen. Första raden måste vara exakt i formatet "diff --git a/sökväg b/sökväg". Skriv ingen inledning, sammanfattning eller Markdown.`);
+    patch = normalizePatch(rawResponse);
+  }
+
+  if (!isUnifiedDiff(patch)) {
+    await writeFile('agent-response.txt', rawResponse);
+    console.error('Modellens svar började med:', rawResponse.slice(0, 500));
+    throw new Error('Modellen returnerade inte en giltig git-diff efter två försök.');
+  }
   await writeFile('agent.patch', patch);
 }
