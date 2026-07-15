@@ -1,4 +1,4 @@
-name: Agent – förbereda implementering
+name: Agent - Implementering
 
 on:
   issues:
@@ -10,78 +10,37 @@ permissions:
 
 jobs:
   prepare-implement:
-    # Triggeras när agent:ready-label läggs till
     if: github.event.label.name == 'agent:ready'
     runs-on: ubuntu-latest
     steps:
-      - name: Skapa implementerings-instruktion
-        uses: actions/github-script@v7
+      - uses: actions/github-script@v7
         with:
           script: |
             const issue = context.payload.issue;
-            const instruction = `# Implementeringsagent - Din instruktion
+            const prompt = `Implementera denna godkanna story i Blush & Bluff:
 
-**Issue #${issue.number}: ${issue.title}**
+STORY:
+${issue.body || 'Ingen story'}
 
-## Din uppgift
-Använd GitHub Copilot i VS Code för att implementera denna godkänd story i koden.
+REGLER:
+- Implementera BARA vad som star i storyn
+- Andra INTE .github, secrets, Firebase-regler
+- Kor node --check app.js for att validera
+- Skapa INGEN release
 
-## Godkänd story
-\`\`\`
-${issue.body || 'Ingen story-detaljer'}
-\`\`\`
+Beskriv vilka filer du andrade och vad du gjorde.`;
 
-## Använd denna prompt med Copilot:
-\`\`\`
-Implementera denna godkända story i Blush & Bluff-projektet.
-
-Story:
-${issue.body || 'Ingen story-detaljer'}
-
-Regler:
-- Implementera BARA vad som står i storyn
-- Ändra INTE GitHub Actions, hemligheter, Firebase-regler eller publiceringsinställningar
-- Kör relevanta kontroller innan du är klar (t.ex. \`node --check app.js\`)
-- Skapa INGEN release eller push själv
-- Bara applikationskod
-
-Beskriv dina ändringar och vilka filer du uppdaterade.
-\`\`\`
-
-## Nästa steg
-1. Kopiera prompten ovan
-2. Öppna Copilot Chat i VS Code (Cmd+I)
-3. Klistra in prompten och kör den
-4. Implementera ändringarna enligt Copiots förslag
-5. Kör \`node --check app.js\` för att validera
-6. Skapa en ny branch: \`git switch -c implement/issue-${issue.number}\`
-7. Committa ändringar: \`git add -A && git commit -m "Implementera story #${issue.number}"\`
-8. Pusha branchen: \`git push origin implement/issue-${issue.number}\`
-9. Skapa PR på GitHub med länk tillbaka till Issue #${issue.number}
-
-GitHub Actions körs automatiskt efter att du pushar:
-- CI-tester validerar koden
-- Review-agent granskar ändringarna
-- Du granskar och slår ihop PR:n när allt ser bra ut
-`;
+            const msg = '### Implementeringsagent aktiverad\n\nKopiera denna prompt till Copilot Chat i VS Code (Cmd+I):\n\n\`\`\`\n' + prompt + '\n\`\`\`\n\nImplementera ändringarna i VS Code, committa sedan och skapa en pull request.';
             
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              body: instruction,
+              body: msg
             });
-            
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
-              labels: ['awaiting-implementation'],
-            });
-            
-            await github.rest.issues.removeLabel({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              name: 'agent:ready',
+              labels: ['awaiting-implementation']
             });
