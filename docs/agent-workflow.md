@@ -34,7 +34,7 @@ flowchart TD
 
 ## Arbetsgång – Steg för steg
 
-### 1️⃣ Story Architect – Skapa en story från en idé
+### 1️⃣ Story Architect – Automatisk story-generering
 
 1. **Skapa en Issue** med en kort idé (one-liner)
    ```
@@ -42,45 +42,54 @@ flowchart TD
    Beskrivning: "Användare bör kunna växla mellan ljust och mörkt tema"
    ```
 
-2. **Lägg etikett `story:expand`** → GitHub Actions skickar instruktion till Issue-kommentar
+2. **Lägg etikett `story:expand`** → Story Architect kör automatiskt och:
+   - Genererar en komplett story-struktur
+   - Uppdaterar Issue-body med: Mål, Bakgrund, Omfattning, Acceptanskriterier, Testplan, Risker, Öppna frågor
+   - Lägger etikett `awaiting-story-review`
 
-3. **Öppna Copilot Chat** i VS Code (Cmd+I) och klistra in den automatiska prompten
+3. **Granska story-utkastet** i Issue-body
+   - Läs igenom strukturen
+   - Uppdatera delar som behöver justering (mål, kriterier, etc.)
+   - Lägg frågor under "Öppna frågor"
 
-4. **Kopiera resultatet** (story-utkastet) och uppdatera Issue-body
-
-5. **Granska och förbättra** story-utkastet själv
-
-6. **Lägg etikett `story`** när du är nöjd
+4. **Lägg etikett `story`** när du är nöjd
 
 ### 2️⃣ Implementeringsagent – Implementera en godkänd story
 
-1. **Lägg etikett `agent:ready`** på en godkänd story → GitHub Actions skickar instruktion
+1. **Lägg etikett `agent:ready`** på en godkänd story → Implementeringsagent:
+   - Visar hela story-texten
+   - Ger instruktioner för git branching och PR-skapande
 
-2. **Öppna Copilot Chat** i VS Code och klistra in prompten
+2. **Implementera i VS Code** med Copilot
+   - Du öppnar Copilot Chat och skriver en prompt baserad på story-texten
+   - Eller låter AI-agenten guida dig
 
-3. **Implementera** det Copilot föreslår (eller justera det själv)
+3. **Skapa branch och committa**:
+   ```
+   git switch -c implement/issue-123
+   git add -A
+   git commit -m "Implementera story #123"
+   git push origin implement/issue-123
+   ```
 
-4. **Kör testerna**: `node --check app.js`
-
-5. **Skapa branch**: `git switch -c implement/issue-123`
-
-6. **Committa**: `git add -A && git commit -m "Implementera story #123"`
-
-7. **Pusha**: `git push origin implement/issue-123`
-
-8. **Skapa PR** på GitHub → CI-agent körs automatiskt
+4. **GitHub skapar en PR automatiskt** (eller du skapar en manuell PR)
+   - CI-tester körs
+   - Review-agent skapar instruktion för granskning
 
 ### 3️⃣ Review-agent – Granska en pull request
 
-1. **PR skapas** → GitHub Actions genererar granskning-instruktion
+1. **PR skapas** → Review-agent skapar instruktion som säger:
+   - Granska koden med Copilot Chat
+   - Leta efter buggar, security-risker, regressioner, saknade tester
 
-2. **Öppna Copilot Chat** och använd den automatiska prompten
+2. **Du granskar koden** med Copilot eller manuellt
+   - Kommentera på PR:n med feedback
+   - Godkänn eller begär ändringar
 
-3. **Granska diff:n** med Copiots hjälp
-
-4. **Kommentera på PR:n** med ditt granskningstilltänkande
-
-5. **Du godkänner och slår ihop** när CI är grön och allt ser bra ut
+3. **Du slår ihop PR:n** när:
+   - CI-tester är gröna
+   - Granskning är klar
+   - Allt ser bra ut
 
 ### 4️⃣ Release – Skapa en produktionsrelease
 
