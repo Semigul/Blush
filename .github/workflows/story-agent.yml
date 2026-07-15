@@ -31,6 +31,7 @@ jobs:
           {
             echo 'story<<STORY_EOF'
             cat story.md
+            echo
             echo 'STORY_EOF'
           } >> "$GITHUB_OUTPUT"
 
