@@ -1,4 +1,4 @@
-name: Agent - Implementering
+name: Agent Implement
 
 on:
   issues:
@@ -9,7 +9,7 @@ permissions:
   issues: write
 
 jobs:
-  prepare-implement:
+  implement:
     if: github.event.label.name == 'agent:ready'
     runs-on: ubuntu-latest
     steps:
@@ -17,30 +17,10 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            const prompt = `Implementera denna godkanna story i Blush & Bluff:
-
-STORY:
-${issue.body || 'Ingen story'}
-
-REGLER:
-- Implementera BARA vad som star i storyn
-- Andra INTE .github, secrets, Firebase-regler
-- Kor node --check app.js for att validera
-- Skapa INGEN release
-
-Beskriv vilka filer du andrade och vad du gjorde.`;
-
-            const msg = '### Implementeringsagent aktiverad\n\nKopiera denna prompt till Copilot Chat i VS Code (Cmd+I):\n\n\`\`\`\n' + prompt + '\n\`\`\`\n\nImplementera ändringarna i VS Code, committa sedan och skapa en pull request.';
-            
+            const msg = 'Implementeringsagent aktiverad for Issue #' + issue.number + '\n\nImplementera detta i VS Code med Copilot:\n' + issue.body;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
               body: msg
-            });
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              labels: ['awaiting-implementation']
             });

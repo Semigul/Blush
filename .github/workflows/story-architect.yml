@@ -1,4 +1,4 @@
-name: Story Architect - Skapa story
+name: Story Architect
 
 on:
   issues:
@@ -9,7 +9,7 @@ permissions:
   issues: write
 
 jobs:
-  prepare-story:
+  expand:
     if: github.event.label.name == 'story:expand'
     runs-on: ubuntu-latest
     steps:
@@ -17,50 +17,10 @@ jobs:
         with:
           script: |
             const issue = context.payload.issue;
-            const prompt = `Skapa ett komplett story-förslag på svenska för Blush & Bluff baserat på denna idé:
-
-IDEA: ${issue.title}
-BESKRIVNING: ${issue.body || 'Ingen ytterligare beskrivning'}
-
-Svara EXAKT i denna format:
-
-## Mål
-[Vad är målet?]
-
-## Bakgrund
-[Varför behövs detta?]
-
-## Omfattning
-[Vad ingår?]
-
-## Utanför omfattning
-[Vad ingår INTE?]
-
-## Acceptanskriterier
-- [Kriterium 1]
-- [Kriterium 2]
-- [Kriterium 3]
-
-## Testplan
-[Hur testar vi detta?]
-
-## Risker
-[Vilka risker finns?]
-
-## Öppna frågor
-[Vad är osäkert?]`;
-
-            const msg = '### Story Architect aktiverad\n\nKopiera denna prompt till Copilot Chat i VS Code (Cmd+I):\n\n\`\`\`\n' + prompt + '\n\`\`\`\n\nKopiera resultatet tillbaka hit och uppdatera Issue-beskrivningen.';
-            
+            const msg = 'Story Architect aktiverad for Issue #' + issue.number + '\n\nKopiera denna prompt till Copilot i VS Code:\n\nSkapa en komplett story med: Mal, Bakgrund, Omfattning, Acceptanskriterier, Testplan, Risker, Oppna fragor\n\nIdea: ' + issue.title;
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
               body: msg
-            });
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              labels: ['awaiting-story-draft']
             });

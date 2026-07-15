@@ -1,4 +1,4 @@
-name: Agent - Granskning
+name: Agent Review
 
 on:
   pull_request:
@@ -10,20 +10,15 @@ permissions:
   pull-requests: write
 
 jobs:
-  prepare-review:
+  review:
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: refs/pull/${{ github.event.pull_request.number }}/merge
-      - name: Skapa granskning-instruktion
-        uses: actions/github-script@v7
+      - uses: actions/github-script@v7
         with:
           script: |
             const pr = context.payload.pull_request;
-            const msg = '### Review-agent aktiverad\n\nKopiera denna PR-diff till Copilot och granska pa: buggar, security-risker, regressioner, saknade tester.\n\nSvara kort pa svenska och skriv "OK - Godkand av agent" om allt ar bra.';
-            
+            const msg = 'Review-agent aktiverad for PR #' + pr.number + '\n\nGranska denna kod med Copilot: Buggar? Security-risker? Regressioner?';
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
