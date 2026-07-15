@@ -1,0 +1,24 @@
+name: Kontrollera pull request
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Kontrollera webbplatsen
+        run: |
+          node --check app.js
+          node --input-type=module -e "JSON.parse(await (await import('node:fs/promises')).readFile('manifest.webmanifest', 'utf8'))"
+          test -f index.html
+          test -f styles.css
+          test -f service-worker.js

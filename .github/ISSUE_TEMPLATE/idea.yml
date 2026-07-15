@@ -1,0 +1,26 @@
+name: Idé eller story
+description: Starta det agentiska flödet med en idé eller en färdig story.
+title: "Idé: "
+labels:
+  - idea
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Idé eller story
+      description: Beskriv vad du vill ändra och varför det skapar värde.
+      placeholder: Jag vill att...
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Kontext
+      description: Lägg till länkar, skärmbilder, begränsningar eller annat som agenten behöver känna till.
+  - type: checkboxes
+    id: readiness
+    attributes:
+      label: Nästa steg
+      options:
+        - label: Jag förstår att en maintainer måste lägga till labeln `agent:refine` eller `agent:implement`.
+          required: true

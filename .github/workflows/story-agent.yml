@@ -1,0 +1,75 @@
+name: Agent – förädla story
+
+on:
+  issues:
+    types: [labeled]
+
+concurrency:
+  group: story-agent-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  refine:
+    if: github.event.label.name == 'agent:refine'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      models: read
+    outputs:
+      story: ${{ steps.model.outputs.story }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Förädla idén med GitHub Models
+        id: model
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          node .github/scripts/github-model-agent.mjs story
+          {
+            echo 'story<<STORY_EOF'
+            cat story.md
+            echo 'STORY_EOF'
+          } >> "$GITHUB_OUTPUT"
+
+  update-issue:
+    needs: refine
+    if: needs.refine.outputs.story != ''
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Uppdatera issue och labels
+        uses: actions/github-script@v7
+        env:
+          STORY: ${{ needs.refine.outputs.story }}
+        with:
+          script: |
+            const issue_number = context.payload.issue.number;
+            const current = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number
+            });
+            const labels = current.data.labels
+              .map(label => typeof label === 'string' ? label : label.name)
+              .filter(Boolean)
+              .filter(label => label !== 'agent:refine' && label !== 'idea');
+            labels.push('story:ready');
+
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              body: process.env.STORY,
+              labels: [...new Set(labels)]
+            });
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number,
+              body: 'Storyn är förädlad. Granska den och lägg till `agent:implement` när den är redo att implementeras.'
+            });
