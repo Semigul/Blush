@@ -134,9 +134,9 @@ function lobby(gameId, players, round) {
 
 function renderRoleCard(data) {
   const role = roles[data.role] || roles.smudgeWolf;
-  app.innerHTML = `<main class="role-page"><section class="role-card"><div class="tag">RUNDA ${data.round} · ${data.name.toUpperCase()}</div><div class="card-seal" id="role-icon">✦</div><h1 id="role-name">Är du redo?</h1><button class="button pink reveal" id="reveal">Bryt sigillet</button><div class="secret" id="secret"><img class="private-role-art" src="${role.image}" alt="${role.name}"><div class="role-secret-copy"><span class="role-alignment">${role.icon} ${role.alignment}</span><h2>${role.name}</h2><p>${role.text}</p></div></div></section></main>`;
-  const secret = document.querySelector('#secret'); const name = document.querySelector('#role-name'); const icon = document.querySelector('#role-icon');
-  document.querySelector('#reveal').onclick = event => { const showing = secret.classList.toggle('show'); name.classList.toggle('hidden', showing); icon.textContent = showing ? role.icon : '✦'; event.currentTarget.textContent = showing ? 'Försegla igen' : 'Bryt sigillet'; };
+  app.innerHTML = `<main class="role-page"><section class="role-card"><div class="tag">RUNDA ${data.round} · ${data.name.toUpperCase()}</div><h1 id="role-name">Är du redo?</h1><div class="secret" id="secret"><img class="private-role-art" src="${role.image}" alt="${role.name}"><div class="role-secret-copy"><span class="role-alignment">${role.icon} ${role.alignment}</span><h2>${role.name}</h2><p>${role.text}</p></div></div><button class="button pink reveal" id="reveal">Bryt sigillet</button></section></main>`;
+  const secret = document.querySelector('#secret'); const name = document.querySelector('#role-name');
+  document.querySelector('#reveal').onclick = event => { const showing = secret.classList.toggle('show'); name.classList.toggle('hidden', showing); event.currentTarget.textContent = showing ? 'Försegla igen' : 'Bryt sigillet'; };
 }
 
 function playerPage(gameId, playerId) {
