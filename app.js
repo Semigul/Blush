@@ -159,19 +159,12 @@ async function restoreHostSetup() {
   if (!hostedGameId) return setup();
   try {
     const gameSnapshot = await getDoc(gameRef(hostedGameId));
-function revealRole(roleKey, playerName, onSeal) {
-  const role = roles[roleKey];
-  shell(`
-    <div class="role-page">
-      <article class="role-card">
-        <div class="tag">Hemlig roll</div>
-        <h1>${role.name}</h1>
-        <img class="private-role-art" src="${role.image}" alt="Illustration för ${role.name}" loading="lazy">
-        <div class="intro">${role.text}</div>
-        <button class="button secondary" id="seal-again">Försegla igen</button>
-      </article>
-    </div>
-  `);
-  const sealBtn = document.getElementById('seal-again');
-  if (sealBtn) sealBtn.addEventListener('click', onSeal);
+    if (!gameSnapshot.exists()) return setup();
+    const playerSnapshots = await getDocs(playersRef(hostedGameId));
+    const players = playerSnapshots.docs.map(snapshot => snapshot.data().name).filter(Boolean);
+    setup(players.length >= 3 ? players : undefined, (gameSnapshot.data().round || 0) + 1);
+  } catch (error) {
+    console.error(error);
+    setup();
+  }
 }
